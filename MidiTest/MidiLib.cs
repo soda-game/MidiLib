@@ -97,7 +97,36 @@ namespace MidiLib
                     headerChunk.timeBase = BitConverter.ToInt16(reader.ReadBytes(2), 0);
                 }
                 //***ヘッダーテスト用
-                HeaderTestLog(headerChunk);
+                //HeaderTestLog(headerChunk);
+
+
+                //-------- トラック解析 -------
+                TrackChunkData[] trackChunks = new TrackChunkData[headerChunk.tracks]; //トラック数分 作る
+
+                //トラック数分回す
+                for (int i = 0; i < trackChunks.Length; i++)
+                {
+                    //チャンクID
+                    trackChunks[i].chunkID = reader.ReadBytes(4);
+
+                    if (BitConverter.IsLittleEndian)
+                    {
+                        //データ長
+                        var bytePick = reader.ReadBytes(4);
+                        Array.Reverse(bytePick);
+                        trackChunks[i].dataLength = BitConverter.ToInt32(bytePick, 0);
+                    }
+                    else
+                    {
+                        //データ長
+                        trackChunks[i].dataLength = BitConverter.ToInt32(reader.ReadBytes(4), 0);
+                    }
+
+                    //演奏データ
+                    trackChunks[i].data = reader.ReadBytes(trackChunks[i].dataLength);
+                    //***トラックテスト用
+                    TrackTestLog(trackChunks[i]);
+                }
 
             }
 
@@ -111,6 +140,12 @@ namespace MidiLib
                 "フォーマット：" + h.format + "\n" +
                 "トラック数：" + h.tracks + "\n" +
                 "分解能：" + h.timeBase);
+        }
+        void TrackTestLog(TrackChunkData t)
+        {
+            Console.WriteLine(
+                 "チャンクID：" + (char)t.chunkID[0] + (char)t.chunkID[1] + (char)t.chunkID[2] + (char)t.chunkID[3] + "\n" +
+                 "データ長：" + t.dataLength);
         }
     }
 }
