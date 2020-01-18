@@ -32,7 +32,7 @@ namespace MidiLib
         }
         struct NoteData
         {
-            public int tickTime;
+            public float tickTime;
             public float msTime;
             public int leanNum; //音階
             public NoteType type;
@@ -42,7 +42,7 @@ namespace MidiLib
 
         struct TempData
         {
-            public int tickTime;
+            public float tickTime;
             public float msTime;
             public float bpm;
             public float tick;
@@ -134,6 +134,8 @@ namespace MidiLib
 
             }
 
+            MstimeFix(ref tempDataList, ref noteDataList);
+
             //テンポ確認用
             TempTestLog(tempDataList);
             //***Notes確認用
@@ -192,7 +194,7 @@ namespace MidiLib
                                 //ノート情報まとめる 
                                 NoteData noteData = new NoteData();
                                 noteData.tickTime = (int)tickTime;
-                                noteData.msTime = noteData.tickTime * tempDataList.Last().tick; //最新のtick値を使う
+                                noteData.msTime = 0; //後でやる
                                 noteData.leanNum = (int)leanNum;
                                 noteData.Instrument = (int)Instrument;
 
@@ -213,7 +215,7 @@ namespace MidiLib
 
                                 NoteData noteData = new NoteData();
                                 noteData.tickTime = (int)tickTime;
-                                noteData.msTime = noteData.tickTime * tempDataList.Last().tick;
+                                noteData.msTime = 0;
                                 noteData.leanNum = (int)leanNum;
                                 noteData.Instrument = (int)Instrument;
                                 noteData.type = NoteType.OFF; //オフしか来ない
@@ -261,6 +263,7 @@ namespace MidiLib
                             {
                                 TempData tempData = new TempData();
                                 tempData.tickTime = (int)tickTime;
+                                tempData.msTime = 0;//後でやる
 
                                 //3byte固定 4分音符の長さをマイクロ秒で
                                 uint temp = 0;
@@ -276,8 +279,6 @@ namespace MidiLib
                                 tempData.bpm = (float)Math.Floor(tempData.bpm * 10) / 10;
                                 //tick値=60/分解能*1000
                                 tempData.tick = (60 / tempData.bpm / header.timeBase * 1000);
-                                //msに変換
-                                tempData.msTime = tempData.tickTime * tempData.tick;
                                 tempDataList.Add(tempData);
                             }
                             break;
@@ -289,6 +290,39 @@ namespace MidiLib
                 }
             }
 
+        }
+
+        void MstimeFix(ref List<TempData> tL, ref List<NoteData> nL)
+        {
+            var beforTempList = new List<TempData>(tL); //変更前の値を保存
+
+            //--テンポのmsTime修正--
+            for (int i = 1; i < tL.Count; i++)
+            {
+                TempData tempData = tL[i]; //現在対象のデータ
+
+                float timeDiff = tempData.tickTime - tL[i - 1].tickTime;
+                tempData.msTime = timeDiff * tL[i - 1].tick + tL[i - 1].msTime;
+
+                tL[i] = tempData;
+            }
+
+            //--ノーツのmsTime修正--
+            for (int i = 0; i < nL.Count; i++)
+            {
+                for (int j = tL.Count - 1; j >= 0; j--)
+                {
+                    if (nL[i].tickTime >= tL[j].tickTime) //テンポ変更した後
+                    {
+                        NoteData note = nL[i];
+
+                        float timeDifference = nL[i].tickTime - tL[j].tickTime;
+                        note.msTime = timeDifference * tL[j].tick + tL[j].msTime;   // 計算後のテンポ変更イベント時間+そこからの自分の時間
+                        nL[i] = note;
+                        break;
+                    }
+                }
+            }
         }
 
         void HeaderTestLog(HeaderChunkData h)
