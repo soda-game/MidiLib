@@ -18,7 +18,7 @@ namespace MidiLib
             public short tracks; //トラック数
             public short timeBase; //分解能
         }
-        struct TrackChunkData
+       struct TrackChunkData
         {
             public byte[] chunkID; //MTrk
             public int dataLength; //トラックのデータ長
@@ -26,11 +26,11 @@ namespace MidiLib
         }
 
         //音げーに必要なものたち
-        enum NoteType
+       public enum NoteType
         {
             ON, OFF
         }
-        struct NoteData
+       public struct NoteData
         {
             public float tickTime;
             public float msTime;
@@ -38,19 +38,19 @@ namespace MidiLib
             public NoteType type;
             public int Instrument; //楽器
         }
-        List<NoteData> noteDataList = new List<NoteData>();
+       public static List<NoteData> noteDataList = new List<NoteData>();
 
-        struct TempData
+       public struct TempData
         {
             public float tickTime;
             public float msTime;
             public float bpm;
             public float tick;
         }
-        List<TempData> tempDataList = new List<TempData>();
+      public static  List<TempData> tempDataList = new List<TempData>();
 
         //main
-        public void ReadMidi(string filePath)
+        public static void ReadMidi(string filePath)
         {
             noteDataList.Clear();
             tempDataList.Clear();
@@ -144,11 +144,10 @@ namespace MidiLib
 
         }
 
-        void TrackDataAnaly(byte[] data, HeaderChunkData header)
+       static void TrackDataAnaly(byte[] data, HeaderChunkData header)
         {
             //トラック内で引き継ぎたいもの
             uint tickTime = 0; //開始からのTick数
-            float tick = 0; //1msにかかるtick数
             byte statusByte = 0; //FFとか入る
             uint Instrument = 0; //楽器
 
@@ -292,7 +291,7 @@ namespace MidiLib
 
         }
 
-        void MstimeFix(ref List<TempData> tL, ref List<NoteData> nL)
+       static void MstimeFix(ref List<TempData> tL, ref List<NoteData> nL)
         {
             var beforTempList = new List<TempData>(tL); //変更前の値を保存
 
@@ -325,7 +324,7 @@ namespace MidiLib
             }
         }
 
-        void HeaderTestLog(HeaderChunkData h)
+      static  void HeaderTestLog(HeaderChunkData h)
         {
             Console.WriteLine(
                 "チャンクID：" + (char)h.chunkID[0] + (char)h.chunkID[1] + (char)h.chunkID[2] + (char)h.chunkID[3] + "\n" +
@@ -334,14 +333,14 @@ namespace MidiLib
                 "トラック数：" + h.tracks + "\n" +
                 "分解能：" + h.timeBase + "\n");
         }
-        void TrackTestLog(TrackChunkData t)
+     static   void TrackTestLog(TrackChunkData t)
         {
             Console.WriteLine(
                  "チャンクID：" + (char)t.chunkID[0] + (char)t.chunkID[1] + (char)t.chunkID[2] + (char)t.chunkID[3] + "\n" +
                  "データ長：" + t.dataLength + "\n");
         }
 
-        void NoteTestLog(List<NoteData> nList)
+      static  void NoteTestLog(List<NoteData> nList)
         {
             foreach (NoteData n in nList)
             {
@@ -354,7 +353,7 @@ namespace MidiLib
             }
         }
 
-        void TempTestLog(List<TempData> tList)
+      static  void TempTestLog(List<TempData> tList)
         {
             foreach (TempData t in tList)
             {
