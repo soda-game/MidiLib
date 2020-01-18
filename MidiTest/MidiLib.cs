@@ -33,9 +33,9 @@ namespace MidiLib
         struct NoteData
         {
             public int eventTime;
-            public int leanNum;
+            public int leanNum; //音階
             public NoteType type;
-            public int color;
+            public int Instrument; //楽器
         }
         List<NoteData> noteDataList = new List<NoteData>();
 
@@ -97,7 +97,7 @@ namespace MidiLib
                     headerChunk.timeBase = BitConverter.ToInt16(reader.ReadBytes(2), 0);
                 }
                 //***ヘッダーテスト用
-                //HeaderTestLog(headerChunk);
+                HeaderTestLog(headerChunk);
 
 
                 //-------- トラック解析 -------
@@ -126,8 +126,159 @@ namespace MidiLib
                     trackChunks[i].data = reader.ReadBytes(trackChunks[i].dataLength);
                     //***トラックテスト用
                     TrackTestLog(trackChunks[i]);
+                    //演奏データ解析へ
+                    TrackDataAnaly(trackChunks[i].data, headerChunk);
                 }
 
+            }
+
+            //テンポ確認用
+            TempTestLog(tempDataList);
+            //***Notes確認用
+            NoteTestLog(noteDataList);
+            
+
+        }
+
+        void TrackDataAnaly(byte[] data, HeaderChunkData header)
+        {
+            //トラック内で引き継ぎたいもの
+            uint eventTime = 0; //開始からの時間
+            byte statusByte = 0; //FFとか入る
+            uint Instrument = 0; //楽器
+
+            //データ分
+            for (int i = 0; i < data.Length;)
+            {
+                //---デルタタイム---
+                uint delta = 0;
+                while (true)
+                {
+                    byte bytePick = data[i++];
+                    delta |= bytePick & (uint)0x7f;
+
+                    if ((bytePick & 0x80) == 0) break;
+
+                    delta = delta << 7;
+                }
+                eventTime += delta;
+
+                //---ランニングステータス---
+                if (data[i] < 0x80)
+                {
+                    //***
+                }
+                else
+                {
+                    statusByte = data[i++];
+                }
+
+                //---ステータスバイト---
+
+                //ステバ分岐 
+                //--Midiイベント--
+                if (statusByte >= 0x80 & statusByte <= 0xef)
+                {
+                    switch (statusByte & 0xf0)
+                    {
+                        case 0x90://ノートオン
+                            {
+                                byte leanNum = data[i++]; //音階
+                                byte velocity = data[i++]; //音の強さ
+
+                                //ノート情報まとめる 
+                                NoteData noteData = new NoteData();
+                                noteData.eventTime = (int)eventTime;
+                                noteData.leanNum = (int)leanNum;
+                                noteData.Instrument = (int)Instrument;
+
+                                //ベロ値でオンオフを送ってくる奴に対応
+                                if (velocity > 0) //音が鳴っていたらオン
+                                    noteData.type = NoteType.ON;
+                                else
+                                    noteData.type = NoteType.OFF;
+
+                                noteDataList.Add(noteData);
+                            }
+                            break;
+
+                        case 0x80: //ノートオフ
+                            {
+                                byte leanNum = data[i++];
+                                byte velocity = data[i++];
+
+                                NoteData noteData = new NoteData();
+                                noteData.eventTime = (int)eventTime;
+                                noteData.leanNum = (int)leanNum;
+                                noteData.Instrument = (int)Instrument;
+                                noteData.type = NoteType.OFF; //オフしか来ない
+
+                                noteDataList.Add(noteData);
+                            }
+                            break;
+
+                        case 0xc0: //プログラムチェンジ　音色 楽器を変える
+                            Instrument = data[i++];
+                            break;
+
+                        case 0xa0: //キープッシャー
+                            i += 2;
+                            break;
+                        case 0xb0: //コンチェ
+                            i += 2;
+                            break;
+                        case 0xd0: //チェンネルプレッシャー
+                            i += 1;
+                            break;
+                        case 0xe0: //ピッチベンド
+                            i += 2;
+                            break;
+                    }
+                }
+
+                //--システムエクスクルーシブイベント--
+                else if (statusByte == 0x70 || statusByte == 0x7f)
+                {
+                    byte dataLen = data[i++];
+                    i += dataLen;
+                }
+
+                //--メタイベ--
+                else if (statusByte == 0xff)
+                {
+                    byte eveNum = data[i++];
+                    byte dataLen = data[i++]; //可変長***
+
+                    switch (eveNum)
+                    {
+                        case 0x51:
+                            {
+                                TempData tempData = new TempData();
+                                tempData.eventTime = (int)eventTime;
+
+                                //3byte固定 4分音符の長さをマイクロ秒で
+                                uint temp = 0;
+                                temp |= data[i++];
+                                temp <<= 8;
+                                temp |= data[i++];
+                                temp <<= 8;
+                                temp |= data[i++];
+
+                                //BPM計算 = 60秒のマクロ秒/4分音符のマイクロ秒
+                                tempData.bpm = 60000000 / (float)temp;
+                                //小数点第１位切り捨て
+                                tempData.bpm = (float)Math.Floor(tempData.bpm * 10) / 10;
+                                //tick値=60/分解能*1000
+                                tempData.tick = (60 / tempData.bpm / header.timeBase * 1000);
+                                tempDataList.Add(tempData);
+                            }
+                            break;
+
+                        default:
+                            i += dataLen; //メタはデータ長で全てとばせる 書くの面倒だった
+                            break;
+                    }
+                }
             }
 
         }
@@ -139,13 +290,36 @@ namespace MidiLib
                 "データ長：" + h.dataLength + "\n" +
                 "フォーマット：" + h.format + "\n" +
                 "トラック数：" + h.tracks + "\n" +
-                "分解能：" + h.timeBase);
+                "分解能：" + h.timeBase + "\n");
         }
         void TrackTestLog(TrackChunkData t)
         {
             Console.WriteLine(
                  "チャンクID：" + (char)t.chunkID[0] + (char)t.chunkID[1] + (char)t.chunkID[2] + (char)t.chunkID[3] + "\n" +
-                 "データ長：" + t.dataLength);
+                 "データ長：" + t.dataLength+"\n");
+        }
+
+        void NoteTestLog(List<NoteData> nList)
+        {
+            foreach (NoteData n in nList)
+            {
+                Console.WriteLine(
+                    "発生時間:" + n.eventTime + "\n" +
+                    "音階:" + n.leanNum + "\n" +
+                    "タイプ:" + n.type.ToString() + "\n" +
+                    "楽器:" + n.Instrument + "\n");
+            }
+        }
+
+        void TempTestLog(List<TempData> tList)
+        {
+            foreach (TempData t in tList)
+            {
+                Console.WriteLine(
+                "発生時間:" + t.eventTime + "\n" +
+                "BPM値:" + t.bpm + "\n" +
+                "Tick値:" + t.tick + "\n");
+            }
         }
     }
 }
