@@ -32,7 +32,8 @@ namespace MidiLib
         }
         struct NoteData
         {
-            public int eventTime;
+            public int tickTime;
+            public float msTime;
             public int leanNum; //音階
             public NoteType type;
             public int Instrument; //楽器
@@ -41,7 +42,8 @@ namespace MidiLib
 
         struct TempData
         {
-            public int eventTime;
+            public int tickTime;
+            public float msTime;
             public float bpm;
             public float tick;
         }
@@ -136,14 +138,15 @@ namespace MidiLib
             TempTestLog(tempDataList);
             //***Notes確認用
             NoteTestLog(noteDataList);
-            
+
 
         }
 
         void TrackDataAnaly(byte[] data, HeaderChunkData header)
         {
             //トラック内で引き継ぎたいもの
-            uint eventTime = 0; //開始からの時間
+            uint tickTime = 0; //開始からのTick数
+            float tick = 0; //1msにかかるtick数
             byte statusByte = 0; //FFとか入る
             uint Instrument = 0; //楽器
 
@@ -161,7 +164,7 @@ namespace MidiLib
 
                     delta = delta << 7;
                 }
-                eventTime += delta;
+                tickTime += delta;
 
                 //---ランニングステータス---
                 if (data[i] < 0x80)
@@ -188,7 +191,8 @@ namespace MidiLib
 
                                 //ノート情報まとめる 
                                 NoteData noteData = new NoteData();
-                                noteData.eventTime = (int)eventTime;
+                                noteData.tickTime = (int)tickTime;
+                                noteData.msTime = noteData.tickTime * tempDataList.Last().tick; //最新のtick値を使う
                                 noteData.leanNum = (int)leanNum;
                                 noteData.Instrument = (int)Instrument;
 
@@ -208,10 +212,12 @@ namespace MidiLib
                                 byte velocity = data[i++];
 
                                 NoteData noteData = new NoteData();
-                                noteData.eventTime = (int)eventTime;
+                                noteData.tickTime = (int)tickTime;
+                                noteData.msTime = noteData.tickTime * tempDataList.Last().tick;
                                 noteData.leanNum = (int)leanNum;
                                 noteData.Instrument = (int)Instrument;
                                 noteData.type = NoteType.OFF; //オフしか来ない
+
 
                                 noteDataList.Add(noteData);
                             }
@@ -254,7 +260,7 @@ namespace MidiLib
                         case 0x51:
                             {
                                 TempData tempData = new TempData();
-                                tempData.eventTime = (int)eventTime;
+                                tempData.tickTime = (int)tickTime;
 
                                 //3byte固定 4分音符の長さをマイクロ秒で
                                 uint temp = 0;
@@ -270,6 +276,8 @@ namespace MidiLib
                                 tempData.bpm = (float)Math.Floor(tempData.bpm * 10) / 10;
                                 //tick値=60/分解能*1000
                                 tempData.tick = (60 / tempData.bpm / header.timeBase * 1000);
+                                //msに変換
+                                tempData.msTime = tempData.tickTime * tempData.tick;
                                 tempDataList.Add(tempData);
                             }
                             break;
@@ -296,7 +304,7 @@ namespace MidiLib
         {
             Console.WriteLine(
                  "チャンクID：" + (char)t.chunkID[0] + (char)t.chunkID[1] + (char)t.chunkID[2] + (char)t.chunkID[3] + "\n" +
-                 "データ長：" + t.dataLength+"\n");
+                 "データ長：" + t.dataLength + "\n");
         }
 
         void NoteTestLog(List<NoteData> nList)
@@ -304,9 +312,10 @@ namespace MidiLib
             foreach (NoteData n in nList)
             {
                 Console.WriteLine(
-                    "発生時間:" + n.eventTime + "\n" +
+                    "開始から:" + n.tickTime + "Tick\n" +
+                    "開始から:" + n.msTime + "ms\n" +
                     "音階:" + n.leanNum + "\n" +
-                    "タイプ:" + n.type.ToString() + "\n" +
+                    "タイプ:ノート" + n.type.ToString() + "\n" +
                     "楽器:" + n.Instrument + "\n");
             }
         }
@@ -316,9 +325,10 @@ namespace MidiLib
             foreach (TempData t in tList)
             {
                 Console.WriteLine(
-                "発生時間:" + t.eventTime + "\n" +
+                "開始から:" + t.tickTime + "Tick\n" +
+                "開始から:" + t.msTime + "ms\n" +
                 "BPM値:" + t.bpm + "\n" +
-                "Tick値:" + t.tick + "\n");
+                "１秒=:" + t.tick + "Tick\n");
             }
         }
     }
