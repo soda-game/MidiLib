@@ -13,7 +13,7 @@ namespace MidiTest
     {
         static void Main(string[] args)
         {
-            string filePath = "C:/Users/K019G1032/Desktop/testvs/New Unity Project/Assets/sound/testDo.mid";
+            string filePath = "testDo.mid";
 
             //midi読み込み
             MidiSystem.ReadMidi(filePath);
