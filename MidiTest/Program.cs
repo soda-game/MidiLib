@@ -18,6 +18,7 @@ namespace MidiTest
             //midi読み込み
             MidiSystem.ReadMidi(filePath);
 
+            //結果を参照
             Console.WriteLine(MidiSystem.noteDataList[0].leanNum);
 
             Console.ReadKey();
