@@ -19,7 +19,8 @@ namespace MidiTest
             MidiSystem.ReadMidi(filePath);
 
             //結果を参照
-            Console.WriteLine(MidiSystem.noteDataList[0].leanNum);
+            Console.WriteLine("参照＿分解能："+MidiSystem.headerData.timeBase);
+            Console.WriteLine("参照＿最初の音階番号：" + MidiSystem.noteDataList[0].leanNum);
 
             Console.ReadKey();
         }
