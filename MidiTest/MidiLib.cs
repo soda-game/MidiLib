@@ -10,7 +10,7 @@ namespace MidiLib
     class MidiSystem
     {
         //チャンクデータ
-        struct HeaderChunkData
+        public struct HeaderChunkData
         {
             public byte[] chunkID; //MThd
             public int dataLength; //ヘッダの長さ
@@ -18,133 +18,162 @@ namespace MidiLib
             public short tracks; //トラック数
             public short timeBase; //分解能
         }
-       struct TrackChunkData
+        public static HeaderChunkData headerData;
+
+        public struct TrackChunkData
         {
             public byte[] chunkID; //MTrk
             public int dataLength; //トラックのデータ長
             public byte[] data; //演奏データ
         }
+        public static TrackChunkData[] trackChunks;
 
         //音げーに必要なものたち
-       public enum NoteType
+        public enum NoteType
         {
             ON, OFF
         }
-       public struct NoteData
+        public struct NoteData
         {
             public float tickTime;
             public float msTime;
             public int leanNum; //音階
             public NoteType type;
-            public int Instrument; //楽器
+            public int ch; //チャンネル 色分け用
         }
-       public static List<NoteData> noteDataList = new List<NoteData>();
+        public static List<NoteData> noteDataList;
 
-       public struct TempData
+        public struct TempData
         {
             public float tickTime;
             public float msTime;
             public float bpm;
             public float tick;
         }
-      public static  List<TempData> tempDataList = new List<TempData>();
+        public static List<TempData> tempDataList;
 
-        //main
+
+        //main--------------------
         public static void ReadMidi(string filePath)
         {
-            noteDataList.Clear();
-            tempDataList.Clear();
+            headerData = new HeaderChunkData();
+
+            noteDataList = new List<NoteData>();
+            tempDataList = new List<TempData>();
 
             //ファイル読み込み 読み込み終わるまで出ない!
             using (var file = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             using (var reader = new BinaryReader(file))
             {
                 //-------- ヘッダ解析 -------
-                var headerChunk = new HeaderChunkData();
-
-                //チャンクID
-                headerChunk.chunkID = reader.ReadBytes(4);
-                //リトルエンディアンなら逆に
-                if (BitConverter.IsLittleEndian)
-                {
-                    //データ長
-                    var bytePick = reader.ReadBytes(4);
-                    Array.Reverse(bytePick);
-                    headerChunk.dataLength = BitConverter.ToInt32(bytePick, 0);
-
-                    //フォーマット
-                    bytePick = reader.ReadBytes(2);
-                    Array.Reverse(bytePick);
-                    headerChunk.format = BitConverter.ToInt16(bytePick, 0);
-
-                    //トラック数
-                    bytePick = reader.ReadBytes(2);
-                    Array.Reverse(bytePick);
-                    headerChunk.tracks = BitConverter.ToInt16(bytePick, 0);
-
-                    //分解能
-                    bytePick = reader.ReadBytes(2);
-                    Array.Reverse(bytePick);
-                    headerChunk.timeBase = BitConverter.ToInt16(bytePick, 0);
-                }
-                else
-                {
-                    //データ長
-                    headerChunk.dataLength = BitConverter.ToInt32(reader.ReadBytes(4), 0);
-                    //フォーマット
-                    headerChunk.format = BitConverter.ToInt16(reader.ReadBytes(2), 0);
-                    //トラック数
-                    headerChunk.tracks = BitConverter.ToInt16(reader.ReadBytes(2), 0);
-                    //分解能
-                    headerChunk.timeBase = BitConverter.ToInt16(reader.ReadBytes(2), 0);
-                }
-                //***ヘッダーテスト用
-                HeaderTestLog(headerChunk);
-
+                HeaderDataAnaly(reader);
 
                 //-------- トラック解析 -------
-                TrackChunkData[] trackChunks = new TrackChunkData[headerChunk.tracks]; //トラック数分 作る
+                trackChunks = new TrackChunkData[headerData.tracks]; //ヘッダからトラック数を参照
 
-                //トラック数分回す
-                for (int i = 0; i < trackChunks.Length; i++)
+                for (int i = 0; i < trackChunks.Length; i++)  //トラック数分回す
                 {
-                    //チャンクID
-                    trackChunks[i].chunkID = reader.ReadBytes(4);
+                    TrackDataAnaly(reader, i);
 
-                    if (BitConverter.IsLittleEndian)
-                    {
-                        //データ長
-                        var bytePick = reader.ReadBytes(4);
-                        Array.Reverse(bytePick);
-                        trackChunks[i].dataLength = BitConverter.ToInt32(bytePick, 0);
-                    }
-                    else
-                    {
-                        //データ長
-                        trackChunks[i].dataLength = BitConverter.ToInt32(reader.ReadBytes(4), 0);
-                    }
-
-                    //演奏データ
-                    trackChunks[i].data = reader.ReadBytes(trackChunks[i].dataLength);
-                    //***トラックテスト用
-                    TrackTestLog(trackChunks[i]);
                     //演奏データ解析へ
-                    TrackDataAnaly(trackChunks[i].data, headerChunk);
+                    TrackMusicAnaly(trackChunks[i].data, headerData);
                 }
-
             }
 
-            MstimeFix(ref tempDataList, ref noteDataList);
+            MstimeFix(ref tempDataList, ref noteDataList); //曲中のBPM変更に対応
 
-            //テンポ確認用
-            TempTestLog(tempDataList);
-            //***Notes確認用
-            NoteTestLog(noteDataList);
+            HeaderTestLog(headerData);//ヘッダーテスト用
+            TrackTestLog(trackChunks); //トラックテスト用
 
+            TempTestLog(tempDataList); //テンポ確認用
+            NoteTestLog(noteDataList); //ノーツ確認用
 
         }
 
-       static void TrackDataAnaly(byte[] data, HeaderChunkData header)
+        //ヘッダー解析
+        static void HeaderDataAnaly(BinaryReader reader)
+        {
+            //チャンクID
+            headerData.chunkID = reader.ReadBytes(4);
+            //リトルエンディアンなら逆に
+            if (BitConverter.IsLittleEndian)
+            {
+                //データ長
+                var bytePick = reader.ReadBytes(4);
+                Array.Reverse(bytePick);
+                headerData.dataLength = BitConverter.ToInt32(bytePick, 0);
+
+                //フォーマット
+                bytePick = reader.ReadBytes(2);
+                Array.Reverse(bytePick);
+                headerData.format = BitConverter.ToInt16(bytePick, 0);
+
+                //トラック数
+                bytePick = reader.ReadBytes(2);
+                Array.Reverse(bytePick);
+                headerData.tracks = BitConverter.ToInt16(bytePick, 0);
+
+                //分解能
+                bytePick = reader.ReadBytes(2);
+                Array.Reverse(bytePick);
+                headerData.timeBase = BitConverter.ToInt16(bytePick, 0);
+            }
+            else
+            {
+                //データ長
+                headerData.dataLength = BitConverter.ToInt32(reader.ReadBytes(4), 0);
+                //フォーマット
+                headerData.format = BitConverter.ToInt16(reader.ReadBytes(2), 0);
+                //トラック数
+                headerData.tracks = BitConverter.ToInt16(reader.ReadBytes(2), 0);
+                //分解能
+                headerData.timeBase = BitConverter.ToInt16(reader.ReadBytes(2), 0);
+            }
+
+        }
+
+        //トラック解析 周回対応
+        static void TrackDataAnaly(BinaryReader reader, int i)
+        {
+            //チャンクID
+            trackChunks[i].chunkID = reader.ReadBytes(4);
+
+            if (BitConverter.IsLittleEndian)
+            {
+                //データ長
+                var bytePick = reader.ReadBytes(4);
+                Array.Reverse(bytePick);
+                trackChunks[i].dataLength = BitConverter.ToInt32(bytePick, 0);
+            }
+            else
+            {
+                //データ長
+                trackChunks[i].dataLength = BitConverter.ToInt32(reader.ReadBytes(4), 0);
+            }
+
+            //演奏データ
+            trackChunks[i].data = reader.ReadBytes(trackChunks[i].dataLength);
+        }
+
+        //デルタ（可変長）計算用
+        static uint deltaMath(byte[] data, ref int i)
+        {
+            uint delta = 0;
+
+            while (true)
+            {
+                byte bytePick = data[i++]; //1byte取る
+                delta |= bytePick & (uint)0x7f; //最初をゼロにして 前のdeltaとくっつける
+
+                if ((bytePick & 0x80) == 0) break; //0なら続かないのでループ抜け
+
+                delta = delta << 7; //次のdeltaのために増設
+            }
+
+            return delta;
+        }
+
+        static void TrackMusicAnaly(byte[] data, HeaderChunkData header)
         {
             //トラック内で引き継ぎたいもの
             uint tickTime = 0; //開始からのTick数
@@ -155,17 +184,7 @@ namespace MidiLib
             for (int i = 0; i < data.Length;)
             {
                 //---デルタタイム---
-                uint delta = 0;
-                while (true)
-                {
-                    byte bytePick = data[i++];
-                    delta |= bytePick & (uint)0x7f;
-
-                    if ((bytePick & 0x80) == 0) break;
-
-                    delta = delta << 7;
-                }
-                tickTime += delta;
+                tickTime += deltaMath(data, ref i);
 
                 //---ランニングステータス---
                 if (data[i] < 0x80)
@@ -179,7 +198,7 @@ namespace MidiLib
 
                 //---ステータスバイト---
 
-                //ステバ分岐 
+                //ステバ分岐 この辺はもう筋肉
                 //--Midiイベント--
                 if (statusByte >= 0x80 & statusByte <= 0xef)
                 {
@@ -195,7 +214,7 @@ namespace MidiLib
                                 noteData.tickTime = (int)tickTime;
                                 noteData.msTime = 0; //後でやる
                                 noteData.leanNum = (int)leanNum;
-                                noteData.Instrument = (int)Instrument;
+                                noteData.ch = statusByte & 0x0f; //下4を取得
 
                                 //ベロ値でオンオフを送ってくる奴に対応
                                 if (velocity > 0) //音が鳴っていたらオン
@@ -216,9 +235,8 @@ namespace MidiLib
                                 noteData.tickTime = (int)tickTime;
                                 noteData.msTime = 0;
                                 noteData.leanNum = (int)leanNum;
-                                noteData.Instrument = (int)Instrument;
+                                noteData.ch = statusByte & 0x0f; //下4を取得
                                 noteData.type = NoteType.OFF; //オフしか来ない
-
 
                                 noteDataList.Add(noteData);
                             }
@@ -254,7 +272,7 @@ namespace MidiLib
                 else if (statusByte == 0xff)
                 {
                     byte eveNum = data[i++];
-                    byte dataLen = data[i++]; //可変長***
+                    byte dataLen = (byte)deltaMath(data,ref i); //可変長
 
                     switch (eveNum)
                     {
@@ -291,7 +309,7 @@ namespace MidiLib
 
         }
 
-       static void MstimeFix(ref List<TempData> tL, ref List<NoteData> nL)
+        static void MstimeFix(ref List<TempData> tL, ref List<NoteData> nL)
         {
             var beforTempList = new List<TempData>(tL); //変更前の値を保存
 
@@ -324,7 +342,7 @@ namespace MidiLib
             }
         }
 
-      static  void HeaderTestLog(HeaderChunkData h)
+        static void HeaderTestLog(HeaderChunkData h)
         {
             Console.WriteLine(
                 "チャンクID：" + (char)h.chunkID[0] + (char)h.chunkID[1] + (char)h.chunkID[2] + (char)h.chunkID[3] + "\n" +
@@ -333,14 +351,16 @@ namespace MidiLib
                 "トラック数：" + h.tracks + "\n" +
                 "分解能：" + h.timeBase + "\n");
         }
-     static   void TrackTestLog(TrackChunkData t)
+        static void TrackTestLog(TrackChunkData[] tArr)
         {
-            Console.WriteLine(
+            foreach (var t in tArr)  //トラック数分回す
+            {
+                Console.WriteLine(
                  "チャンクID：" + (char)t.chunkID[0] + (char)t.chunkID[1] + (char)t.chunkID[2] + (char)t.chunkID[3] + "\n" +
                  "データ長：" + t.dataLength + "\n");
+            }
         }
-
-      static  void NoteTestLog(List<NoteData> nList)
+        static void NoteTestLog(List<NoteData> nList)
         {
             foreach (NoteData n in nList)
             {
@@ -349,11 +369,10 @@ namespace MidiLib
                     "開始から:" + n.msTime + "ms\n" +
                     "音階:" + n.leanNum + "\n" +
                     "タイプ:ノート" + n.type.ToString() + "\n" +
-                    "楽器:" + n.Instrument + "\n");
+                    "チャンネル:" + n.ch + "\n");
             }
         }
-
-      static  void TempTestLog(List<TempData> tList)
+        static void TempTestLog(List<TempData> tList)
         {
             foreach (TempData t in tList)
             {
