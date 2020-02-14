@@ -22,6 +22,7 @@ namespace MidiTest
             //結果を参照
             Console.WriteLine("参照＿最初のレーン番号：" + MidiSystem.a_noteDataList[0].leanNum);
             Console.WriteLine("参照＿最初の長さ：" + MidiSystem.a_noteDataList[0].Length);
+            Console.WriteLine("参照＿最初のノーツの速さ：" + MidiSystem.a_tempDataList[0].speed);
 
             Console.ReadKey();
         }

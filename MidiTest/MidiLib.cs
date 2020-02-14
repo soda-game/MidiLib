@@ -8,6 +8,7 @@ namespace MidiLib
     class MidiSystem
     {
         const int LEAN_BASE = 60; //中央ド
+        const int SECOND_BASE = 60; //中央ド
 
         //チャンクデータ
         public struct HeaderChunkData
@@ -78,17 +79,17 @@ namespace MidiLib
             using (var reader = new BinaryReader(file))
             {
                 //-------- ヘッダ解析 -------
-                HeaderDataAnaly(ref headerData,reader);
+                HeaderDataAnaly(ref headerData, reader);
 
                 //-------- トラック解析 -------
                 trackChunks = new TrackChunkData[headerData.tracks]; //ヘッダからトラック数を参照
 
                 for (int i = 0; i < trackChunks.Length; i++)  //トラック数分回す
                 {
-                    TrackDataAnaly(ref trackChunks,reader, i);
+                    TrackDataAnaly(ref trackChunks, reader, i);
 
                     //演奏データ解析へ
-                    TrackMusicAnaly(trackChunks[i].data, headerData,ref b_noteDataList,ref b_tempDataList);
+                    TrackMusicAnaly(trackChunks[i].data, headerData, ref b_noteDataList, ref b_tempDataList);
                 }
             }
 
@@ -99,7 +100,7 @@ namespace MidiLib
             AftrNoteCreate(b_noteDataList, headerData.timeBase, baseScale);
 
             a_tempDataList = new List<Aftr_TempData>();
-
+            AftrTempCreate(b_tempDataList, baseScale);
 
             //以下ログ
             DataTestLog(headerData);
@@ -194,7 +195,7 @@ namespace MidiLib
         }
 
         //トラック演奏データ解析
-        static void TrackMusicAnaly(byte[] data, HeaderChunkData header,ref List<Bfr_NoteData> b_noteL,ref List<Bfr_TempData> b_tmpL)
+        static void TrackMusicAnaly(byte[] data, HeaderChunkData header, ref List<Bfr_NoteData> b_noteL, ref List<Bfr_TempData> b_tmpL)
         {
             //トラック内で引き継ぎたいもの
             uint tickTime = 0; //開始からのTick数
@@ -312,11 +313,11 @@ namespace MidiLib
                                 temp |= data[i++];
 
                                 //BPM計算 = 60秒のマクロ秒/4分音符のマイクロ秒
-                                tempData.bpm = 60000000 / (float)temp;
+                                tempData.bpm = SECOND_BASE * 1000000 / (float)temp;
                                 //小数点第１位切り捨て
                                 tempData.bpm = (float)Math.Floor(tempData.bpm * 10) / 10;
                                 //tick値=60/分解能*1000
-                                tempData.tick = (60 / tempData.bpm / header.timeBase * 1000);
+                                tempData.tick = (SECOND_BASE / tempData.bpm / header.timeBase * 1000);
                                 b_tmpL.Add(tempData);
                             }
                             break;
@@ -365,7 +366,7 @@ namespace MidiLib
         }
 
         //欲しいデータに変換
-        static void AftrNoteCreate( List<Bfr_NoteData> nL, int timeBase, int baseScale)
+        static void AftrNoteCreate(List<Bfr_NoteData> nL, int timeBase, int baseScale)
         {
             for (int i = 0; i < nL.Count; i++)
             {
@@ -390,11 +391,21 @@ namespace MidiLib
                 int leanNum = onNote.leanNum - LEAN_BASE;
 
                 //--リスイン--
-                var a_NoteData = new Aftr_NoteData { msTime = onNote.msTime, Length = length, leanNum = leanNum, ch = onNote.ch };
-                a_noteDataList.Add(a_NoteData);
+                var a_noteData = new Aftr_NoteData { msTime = onNote.msTime, Length = length, leanNum = leanNum, ch = onNote.ch };
+                a_noteDataList.Add(a_noteData);
             }
         }
-
+        static void AftrTempCreate(List<Bfr_TempData> b_tmpL, int baseScale)
+        {
+            foreach (var b_tL in b_tmpL)
+            {
+                //速さ
+                float speed = b_tL.bpm / SECOND_BASE * baseScale;
+                //リスイン
+                var a_tmpData = new Aftr_TempData { msTime = b_tL.msTime, speed = speed };
+                a_tempDataList.Add(a_tmpData);
+            }
+        }
 
         //テストログ
         static void DataTestLog(HeaderChunkData h)
@@ -444,7 +455,7 @@ namespace MidiLib
             {
                 Console.WriteLine(
                     "開始から:" + n.msTime + "ms\n" +
-                    "長さ" + n.Length+ "\n" +
+                    "長さ：" + n.Length + "\n" +
                     "音階:" + n.leanNum + "\n" +
                     "チャンネル:" + n.ch + "\n");
             }
@@ -455,7 +466,7 @@ namespace MidiLib
             {
                 Console.WriteLine(
                 "開始から:" + t.msTime + "ms\n" +
-                "速さ" + t.speed + "\n");
+                "速さ：" + t.speed + "\n");
             }
         }
     }
