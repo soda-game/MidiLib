@@ -14,10 +14,11 @@ namespace MidiTest
         static void Main(string[] args)
         {
             int baseScale = 10;
+            float magniSpeed = 1f; //速度倍率
             string filePath = "testDo.mid";
 
             //midi読み込み
-            MidiSystem.ReadMidi(filePath,baseScale);
+            MidiSystem.ReadMidi(filePath,baseScale,magniSpeed);
 
             //結果を参照
             Console.WriteLine("参照＿最初のレーン番号：" + MidiSystem.a_noteDataList[0].leanNum);
