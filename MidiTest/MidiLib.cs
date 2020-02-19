@@ -7,6 +7,9 @@ namespace MidiLib
 {
     class MidiSystem
     {
+        const float H = 2;
+        public const int NON = -1;
+
         const int LEAN_BASE = 60; //中央ド
         const int SECOND_BASE = 60; //中央ド
 
@@ -62,6 +65,8 @@ namespace MidiLib
             public float speed; //ノーツの速さ
         }
         public static List<Aftr_TempData> a_tempDataList;
+
+
 
         //main--------------------
         public static void ReadMidi(string filePath, int _baseScale, float magniSpeed/*速度倍率*/)
@@ -469,5 +474,26 @@ namespace MidiLib
                 "速さ：" + t.speed + "\n");
             }
         }
+
+        //外部参照系----------------------------------------------------------------------
+
+        //ノーツリストから時間が合うノーツを取り出す
+        public static Aftr_NoteData NoteDataPick(int noteNum, float time, int fastSecond)
+        {
+            if (!(noteNum < a_noteDataList.Count && a_noteDataList[noteNum].msTime / 1000 <= time + fastSecond)) return new Aftr_NoteData { msTime = NON };
+            return a_noteDataList[noteNum];
+        }
+        //テンポリストから(同上
+        public static Aftr_TempData TempDataPick(float time)
+        {
+            return a_tempDataList.Find(n => n.msTime <= time);
+        }
+
+        //ちゃんと出現するように差分を求める
+        public static float NotesPosition_Y(int noteNum, float time, int fastSecond, float speed, float length)
+        {
+            return (a_noteDataList[noteNum].msTime / 1000 - (time + fastSecond)) * speed + length / H;
+        }
+
     }
 }
