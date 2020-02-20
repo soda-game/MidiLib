@@ -13,14 +13,17 @@ namespace MidiTest
     {
         static void Main(string[] args)
         {
+            int baseScale = 10;
+            float magniSpeed = 1f; //速度倍率
             string filePath = "testDo.mid";
 
             //midi読み込み
-            MidiSystem.ReadMidi(filePath);
+            MidiSystem.ReadMidi(filePath,baseScale,magniSpeed);
 
             //結果を参照
-            Console.WriteLine("参照＿分解能："+MidiSystem.headerData.timeBase);
-            Console.WriteLine("参照＿最初の音階番号：" + MidiSystem.noteDataList[0].leanNum);
+            Console.WriteLine("参照＿最初のレーン番号：" + MidiSystem.a_noteDataList[0].leanNum);
+            Console.WriteLine("参照＿最初の長さ：" + MidiSystem.a_noteDataList[0].Length);
+            Console.WriteLine("参照＿最初のノーツの速さ：" + MidiSystem.a_tempDataList[0].speed);
 
             Console.ReadKey();
         }
