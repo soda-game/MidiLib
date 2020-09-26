@@ -7,9 +7,7 @@ SMF(MIDI)の"音の始まり 終わり BPM"などを参照し、ノーツとし�
 ## 使用例
 音ゲーなどに使えます。
 
-このライブラリを使って実際にノーツを出現させたもの→ https://github.com/inTester/MidiLib/tree/ver1.0
-
-上記のプロジェクトのデモ動画→ https://youtu.be/_LEUUyxVGns
+このライブラリを使って実際にノーツを出現させたもの→ https://github.com/soda-game/NotesGame
 
 デモ用音楽：魔王魂 様
 
